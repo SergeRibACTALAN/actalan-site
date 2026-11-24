@@ -30,10 +30,10 @@
   function score(model, ans, flags, mode) {
     var all = flat(model), set = mode === 'grille' ? all : expressSet(model);
     var app = set.filter(function (x) { return applicable(x.q, flags); });
-    var n = app.length, s = 0, pts = 0, nR = 0, nE = 0, nU = 0, rows = [];
+    var n = app.length, s = 0, pts = 0, nR = 0, nE = 0, nU = 0, nM = 0, rows = [];
     app.forEach(function (x, i) {
       var a = ans[x.q.id]; if (!(a in SC)) a = 'U';
-      if (a === 'U') nU++; else { s++; pts += SC[a]; if (a === 'R') nR++; if (a === 'E') nE++; }
+      if (a === 'U') nU++; else { s++; pts += SC[a]; if (a === 'R') nR++; if (a === 'E') nE++; if (a === 'M') nM++; }
       rows.push({ q: x.q, di: x.di, a: a, o: i });
     });
     var idx = s ? pts / (3 * s) : null;
@@ -42,17 +42,17 @@
     var crit = null;
     [model.crit, model.repli].some(function (c) { var q = c && byCode[c]; if (q && applicable(q, flags)) { crit = q; return true; } return false; });
     var ca = crit ? (ans[crit.id] in SC ? ans[crit.id] : 'U') : null;
-    var maxR = Math.max(2, Math.ceil(0.2 * n)), maxE = Math.floor(s / 10);
+    var maxR = Math.max(3, Math.ceil(0.2 * n)), maxE = Math.floor(s / 10), needM = Math.ceil(0.6 * s);
     var minM = Math.ceil((mode === 'grille' ? 0.9 : 0.85) * n);
     var prof, why = [], caps = [];
     if (crit && ca === 'R') { prof = 'F'; why.push('crit'); if (s < minS) why.push('partial'); }
     else if (s < minS) { prof = 'V'; why.push('min'); }
     else if (idx < 0.40) { prof = 'F'; why.push('idx'); }
     else if (nR >= maxR) { prof = 'F'; why.push('nR'); }
-    else if (idx >= 0.80 && nR === 0 && nE <= maxE && !(crit && ca === 'U') && s >= minM) { prof = 'M'; if (nU) why.push('someU'); }
+    else if (idx >= 0.80 && nR === 0 && nE <= maxE && nM >= needM && !(crit && ca === 'U') && s >= minM) { prof = 'M'; if (nU) why.push('someU'); }
     else {
       prof = 'S';
-      if (idx >= 0.80) { if (nR) caps.push('R'); if (nE > maxE) caps.push('E'); if (crit && ca === 'U') caps.push('critU'); if (s < minM) caps.push('U'); }
+      if (idx >= 0.80) { if (nR) caps.push('R'); if (nE > maxE) caps.push('E'); if (nM < needM) caps.push('M'); if (crit && ca === 'U') caps.push('critU'); if (s < minM) caps.push('U'); }
     }
     var isX = function (q) { return q.code && model.express.indexOf(q.code) >= 0 ? 0 : 1; };
     var weak = rows.filter(function (r) { return r.a !== 'U' && r.a !== 'M'; }).sort(function (a, b) {
@@ -65,7 +65,7 @@
     var alerts = (model.alertes || []).filter(function (al) {
       var q = byCode[al.code]; if (!q || !applicable(q, flags)) return false; var a = ans[q.id]; return a === 'R' || a === 'E';
     });
-    return { mode: mode, n: n, s: s, nR: nR, nE: nE, nU: nU, idx: idx, minS: minS, minM: minM, prof: prof, why: why, caps: caps, crit: crit, critAns: ca,
+    return { mode: mode, n: n, s: s, nR: nR, nE: nE, nU: nU, nM: nM, idx: idx, minS: minS, minM: minM, prof: prof, why: why, caps: caps, crit: crit, critAns: ca,
       critIsRepli: !!(crit && crit.code !== model.crit),
       rows: rows, weak: weak, unknown: rows.filter(function (r) { return r.a === 'U'; }), dims: dims, alerts: alerts };
   }
@@ -199,11 +199,11 @@
     if (r.why.indexOf('min') >= 0) t.push('Seules ' + r.s + ' questions sur ' + r.n + ' ont reçu une réponse exploitable (il en faut au moins ' + r.minS + ').');
     if (r.why.indexOf('idx') >= 0) t.push('Vos réponses se situent majoritairement entre « En cours » et « Rien de formalisé ».');
     if (r.why.indexOf('nR') >= 0) t.push(r.nR + ' réponses « Rien de formalisé » sur ' + r.n + ' questions.');
-    if (r.prof === 'M') t.push('Vos réponses sont presque toutes « Maîtrisé » ou « Partiel », sans point bloquant.');
+    if (r.prof === 'M') t.push('Vos réponses sont en majorité « Maîtrisé », sans point bloquant.');
     if (r.why.indexOf('someU') >= 0) t.push(r.nU + (r.nU > 1 ? ' questions restent' : ' question reste') + ' sans réponse : à éclaircir.');
     if (r.prof === 'S') {
       if (r.caps.length) {
-        var m = []; if (r.caps.indexOf('R') >= 0) m.push('au moins une réponse « Rien de formalisé »'); if (r.caps.indexOf('E') >= 0) m.push('des réponses « En cours »');
+        var m = []; if (r.caps.indexOf('R') >= 0) m.push('au moins une réponse « Rien de formalisé »'); if (r.caps.indexOf('E') >= 0) m.push('des réponses « En cours »'); if (r.caps.indexOf('M') >= 0) m.push('moins de 60 % de réponses « Maîtrisé »');
         if (r.caps.indexOf('critU') >= 0) m.push('la question critique sans réponse'); if (r.caps.indexOf('U') >= 0) m.push('trop de questions sans réponse (' + r.nU + ' sur ' + r.n + ')');
         t.push('Le niveau d’ensemble est élevé, mais le profil « Maîtrisé » n’est pas retenu : ' + m.join(', ') + '.');
       } else t.push('Des éléments sont en place ; d’autres restent partiels, en cours ou absents.');
