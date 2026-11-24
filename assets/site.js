@@ -43,10 +43,19 @@
     }
     if (mx) w.hidden = n > mx;
   });
-  all('[data-tk]').forEach(function (c) {
-    var n = days(c.getAttribute('data-tk'));
-    if (n < 0) { c.hidden = true; return; }
-    var b = c.querySelector('b'); if (b) b.textContent = n;
+  /* bandeau des echeances : compte en jours, repartition entre les deux lignes (avant et apres la frontiere), vitesse constante */
+  all('.tk-t').forEach(function (t) {
+    var far = t.getAttribute('data-tkr') === '1', cut = +(t.getAttribute('data-tkc') || 548), vis = 0;
+    all('.tk-i', t).forEach(function (c) {
+      var n = days(c.getAttribute('data-tk')), b = c.querySelector('b');
+      c.hidden = n < 0 || (far ? n < cut : n >= cut);
+      if (!c.hidden) vis++;
+      if (b) { b.textContent = Math.max(n, 0); c.classList.toggle('u', n <= 90); }
+    });
+    var r = t.parentNode && t.parentNode.parentNode;
+    if (r && r.classList.contains('tk-r')) r.hidden = !vis;
+    var w = t.scrollWidth / 2, v = +(t.getAttribute('data-tkv') || 60);
+    if (w > 0) t.style.animationDuration = Math.max(12, w / v).toFixed(1) + 's';
   });
 
   /* anneau et ligne du temps des fiches */
