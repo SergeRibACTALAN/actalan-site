@@ -1,0 +1,11 @@
+# Site statique Actalan (24/11/2026)
+DirectoryIndex index.html
+ErrorDocument 404 /404.html
+RewriteEngine On
+# www -> sans www, et http -> https
+RewriteCond %{HTTP_HOST} ^www\.actalan\.com$ [NC,OR]
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://actalan.com/$1 [R=301,L]
+# anciennes pages du site WordPress
+RewriteRule ^presentation/?$ /le-cabinet.html [R=301,L]
+RewriteRule ^contact/?$ /index.html#contact [R=301,NE,L]
